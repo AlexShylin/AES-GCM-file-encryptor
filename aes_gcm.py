@@ -1,77 +1,115 @@
-"""This module tries to explain AES GCM mode with an example."""
+"""This script encrypts or decrypts file using AES-256 in GCM mode."""
+
+import sys
+from getpass import getpass
+from base64 import b64encode, b64decode
 
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-# Authenticated encryption on a string using AES GCM with both encryption and MAC
+static_header = b"Si vis pacem, para bellum"
+header_length = len(static_header)
+nonce_length = 16
+tag_length = 16
+salt_length = 16
 
-# Key generation
-kdf_salt = get_random_bytes(16)
-default_passphrase = "I!LIKE!IKE!"
-user_passphrase = raw_input("SECRET PASSPHRASE INPUT\nYou will need this to decrypt\nDefault: " + str(default_passphrase) + "\nEnter secret passphrase:")
-passphrase = user_passphrase or default_passphrase
-print "Passphrase used: " + str(passphrase)
-key = PBKDF2(passphrase, kdf_salt)
-print "AES Encryption Key: " + str(key)
+def encrypt(raw_input):
+    # Key generation
+    salt = get_random_bytes(salt_length)
+    password = getpass()
+    key = PBKDF2(password, salt)
 
-# Sensitive data to encrypt
-default_sensitive_data = "Commence attack on 6 June 1944 at the coast of Normandy"
-user_sensitive_data = raw_input("\n\nSENSITIVE DATA INPUT\nDefault: " + str(default_sensitive_data) + "\nEnter sensitive data to encrypt:")
-sensitive_data = user_sensitive_data or default_sensitive_data
-print "Sensitive data encrypted: " + str(sensitive_data)
+    cipher = AES.new(key, AES.MODE_GCM, mac_len=tag_length)
+    cipher.update(static_header)
+    ciphertext, tag = cipher.encrypt_and_digest(raw_input)
+    nonce = cipher.nonce
 
-# Additional data to authenticate - won't be encrypted but will be authenticated
-default_aad = "Operation Overlord"
-user_aad = raw_input("\n\nAAD INPUT\nThis won't be encrypted but it will be authenticated\nDefault: " + str(default_aad) + "\nEnter associated authenticated data:")
-aad = user_aad or default_aad
-print "Associated authenticated data: " + str(aad)
+    mix = static_header + nonce + tag + salt + ciphertext
+    return b64encode(mix)
 
-# Encrypt using AES GCM
-cipher = AES.new(key, AES.MODE_GCM)
-cipher.update(aad)
-ciphertext, tag = cipher.encrypt_and_digest(sensitive_data)
-# Nonce is generated randomly if not provided explicitly
-nonce = cipher.nonce
+def decrypt(encrypted_input):
+    b = b64decode(encrypted_input)
+    header = b[0:header_length]
+    nonce = b[header_length:header_length + nonce_length]
+    tag = b[header_length + nonce_length:header_length + nonce_length + tag_length]
+    salt = b[header_length + nonce_length + tag_length:header_length + nonce_length + tag_length + salt_length]
+    ciphertext = b[header_length + nonce_length + salt_length + tag_length:]
 
-# Print all the components of the message
-print "\nCOMPONENTS OF TRANSMITTED MESSAGE"
-print "AAD: " + str(aad)
-print "Ciphertext: " + str(ciphertext)
-print "Authentication tag: " + str(tag)
-print "Nonce: " + str(nonce)
-print "KDF salt: " + str(kdf_salt)
+    # Key generation
+    password = getpass()
+    decryption_key = PBKDF2(password, salt)
 
-# Message to transmit/share
-transmitted_message = aad, ciphertext, tag, nonce, kdf_salt
-print "\nTransmitted message: " + str(transmitted_message)
+    # Validate MAC and decrypt
+    # If MAC validation fails, ValueError exception will be thrown
+    cipher = AES.new(decryption_key, AES.MODE_GCM, nonce)
+    cipher.update(header)
+    try:
+        decrypted_data = cipher.decrypt_and_verify(ciphertext, tag)
+        return decrypted_data
+    except ValueError as mac_mismatch:
+        print("\nMAC validation failed during decryption. No authentication guarantees on this ciphertext")
+        print("\nUnauthenticated Header: " + str(header))
+        raise mac_mismatch
 
-#
-#
-#
-#
-# Decryption step
-# The receiver code begins here
-print "\n\n\n"
-received_msg = transmitted_message
-print "Received message: " + str(received_msg)
-received_aad, received_ciphertext, received_tag, received_nonce, received_kdf_salt = received_msg
+def read_file(path):
+    with open(path, 'rb') as file:
+        data = file.read()
+    return data
 
-# Generate decryption key from passphrase and salt
-decryption_passphrase = raw_input("Enter decryption passphrase:")
-decryption_key = PBKDF2(decryption_passphrase, received_kdf_salt)
-print "Decryption Key: " + str(decryption_key)
+def write_to_file(path, content):
+    with open(path, "xb") as file:
+        file.write(content)
 
-# Validate MAC and decrypt
-# If MAC validation fails, ValueError exception will be thrown
-cipher = AES.new(decryption_key, AES.MODE_GCM, received_nonce)
-cipher.update(received_aad)
-try:
-    decrypted_data = cipher.decrypt_and_verify(received_ciphertext, received_tag)
-    print "\nMAC validated: Data was encrypted by someone with the shared secret passphrase"
-    print "All allies have passphrase - SYMMETRIC encryption!!!"
-    print "\nAuthenticated AAD: " + str(received_aad)
-    print "Decrypted sensitive data: " + str(decrypted_data)
-except ValueError as mac_mismatch:
-    print "\nMAC validation failed during decryption. No authentication gurantees on this ciphertext"
-    print "\nUnauthenticated AAD: " + str(received_aad)
+def print_help():
+    print("====================================")
+    print("* AES-GCM File Encryptor/Decryptor *")
+    print("====================================")
+    print("\nUsage:")
+    print("  python aes_gcm.py <operation> <input_file> <output_file>")
+    print("  python aes_gcm.py help")
+    print("\nOperations:")
+    print("  encrypt    Encrypt a file using AES-GCM with password-based key")
+    print("  decrypt    Decrypt a file encrypted with this tool")
+    print("  help       Display this help message")
+    print("\nExamples:")
+    print("  python aes_gcm.py encrypt plaintext.txt encrypted.bin")
+    print("  python aes_gcm.py decrypt encrypted.bin decrypted.txt")
+    print("\nNotes:")
+    print("  - You will be prompted to enter a password")
+    print("  - The output file must not already exist")
+    print("  - Uses AES-256 in GCM mode with PBKDF2 key derivation")
+    print("  - Provides authenticated encryption with integrity protection")
+
+
+if __name__ == '__main__':
+    command_line_args = sys.argv
+    if len(command_line_args) == 1:
+        print_help()
+
+    operation_type = command_line_args[1]
+    if operation_type == "help":
+        print_help()
+    elif operation_type == "encrypt":
+        if len(command_line_args) != 4:
+            print("Invalid number of arguments", file=sys.stderr)
+            print_help()
+        else:
+            input_file_path = command_line_args[2]
+            output_file_path = command_line_args[3]
+            input_file_content = read_file(input_file_path)
+            encrypted_content = encrypt(input_file_content)
+            write_to_file(output_file_path, encrypted_content)
+    elif operation_type == "decrypt":
+        if len(command_line_args) != 4:
+            print("Invalid number of arguments", file=sys.stderr)
+            print_help()
+        else:
+            input_file_path = command_line_args[2]
+            output_file_path = command_line_args[3]
+            input_file_content = read_file(input_file_path)
+            decrypted_content = decrypt(input_file_content)
+            write_to_file(output_file_path, decrypted_content)
+    else:
+        print("Unknown operation type", file=sys.stderr)
+        print_help()
