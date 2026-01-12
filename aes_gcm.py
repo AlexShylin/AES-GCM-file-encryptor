@@ -1,13 +1,12 @@
-"""This module encrypts or decrypts file in AES GCM mode."""
+"""This script encrypts or decrypts file using AES-256 in GCM mode."""
+
+import sys
+from getpass import getpass
+from base64 import b64encode, b64decode
 
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
-from base64 import b64encode, b64decode
-
-from getpass import getpass
-from json import dumps, loads
-import sys
 
 static_header = b"Si vis pacem, para bellum"
 header_length = len(static_header)
@@ -63,7 +62,24 @@ def write_to_file(path, content):
         file.write(content)
 
 def print_help():
-    print("help stub")
+    print("====================================")
+    print("* AES-GCM File Encryptor/Decryptor *")
+    print("====================================")
+    print("\nUsage:")
+    print("  python aes_gcm.py <operation> <input_file> <output_file>")
+    print("  python aes_gcm.py help")
+    print("\nOperations:")
+    print("  encrypt    Encrypt a file using AES-GCM with password-based key")
+    print("  decrypt    Decrypt a file encrypted with this tool")
+    print("  help       Display this help message")
+    print("\nExamples:")
+    print("  python aes_gcm.py encrypt plaintext.txt encrypted.bin")
+    print("  python aes_gcm.py decrypt encrypted.bin decrypted.txt")
+    print("\nNotes:")
+    print("  - You will be prompted to enter a password")
+    print("  - The output file must not already exist")
+    print("  - Uses AES-256 in GCM mode with PBKDF2 key derivation")
+    print("  - Provides authenticated encryption with integrity protection")
 
 
 if __name__ == '__main__':

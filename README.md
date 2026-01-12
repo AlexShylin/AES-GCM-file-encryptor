@@ -25,7 +25,7 @@ source ./.venv/bin/activate
 
 pip install -r requirements.txt 
 
-python aes_gcm_file.py help
-python aes_gcm_file.py encrypt /home/user/my_file.jpeg /home/user/my_encrypted_file.jpeg
-python aes_gcm_file.py decrypt /home/user/my_encrypted_file.jpeg /home/user/my_decrypted_file.jpeg
+python aes_gcm.py help
+python aes_gcm.py encrypt /home/user/my_file.jpeg /home/user/my_encrypted_file.jpeg
+python aes_gcm.py decrypt /home/user/my_encrypted_file.jpeg /home/user/my_decrypted_file.jpeg
 ```
