@@ -18,6 +18,9 @@ def encrypt(raw_input):
     # Key generation
     salt = get_random_bytes(salt_length)
     password = getpass()
+    repeat_password = getpass("Repeat password:")
+    if password != repeat_password:
+        raise IOError("Passwords do not match")
     key = PBKDF2(password, salt)
 
     cipher = AES.new(key, AES.MODE_GCM, mac_len=tag_length)
